@@ -1,0 +1,598 @@
+%!PS-Adobe-3.0 
+% this line and the line above get replaced by knot.tcl
+
+% place customizations here:
+%
+% to change the band color of a monochrome knot (default light blue):
+%   /monocolor { ... } def
+%
+% to change the background color (default white):
+%   /bgcolor { ... } def
+%
+% to change the edge color (default black):
+%   /edgecolor { ... } def
+%
+% to change the width of the main band (default 0.4):
+%   /w ... def
+%
+% to change the width of the edge bands (default 0.05):
+%   /d ... def
+%
+% to change the width of the intersection separator (default 0.1):
+%   /s ... def
+
+%%%
+%%% parameter defaults
+%%%
+
+%% bind all undefined parameters with default values 
+
+/monocolor where { pop } {
+  /monocolor { 0.7 0.8 1 setrgbcolor } bind def
+} ifelse
+
+/bgcolor where { pop } {
+  /bgcolor { 1 setgray } bind def
+} ifelse
+
+/edgecolor where { pop } {
+  /edgecolor { 0 setgray } bind def
+} ifelse
+
+/w where { pop } {
+  /w 0.4 def
+} ifelse
+
+/d where { pop } {
+  /d 0.05 def
+} ifelse
+
+/s where { pop } {
+  /s 0.1 def
+} ifelse
+
+%% now some derived values and utility procedures
+%% useful in the main knoxel code
+
+/wp w 2 sqrt div def
+/dp d 2 sqrt div def
+/sp s 2 sqrt div def
+
+/wdd w d d add add def
+/wddss w d d s s add add add add def
+
+/edgeband {
+  d 0 gt {
+    gsave
+      edgecolor
+      wdd setlinewidth
+      stroke
+    grestore
+  } if
+} bind def
+
+/separatorband {
+  s 0 gt {
+    gsave
+      bgcolor
+      wddss setlinewidth
+      stroke
+    grestore
+  } if
+} bind def
+      
+%%%
+%%% fundamental knoxels
+%%%
+
+% diagonal line
+/diagonal {
+  newpath -1 -1 moveto 2 2 lineto
+  edgeband
+  primary_color
+  w setlinewidth
+  stroke
+
+  1 -1 moveto -1 1 lineto
+  separatorband
+  edgeband
+  secondary_color
+  w setlinewidth
+  stroke
+} bind def
+    
+% vertical line
+/straight {
+  0.5 -1 moveto 0 3 rlineto
+  edgeband
+  primary_color
+  w setlinewidth
+  stroke
+} bind def
+
+% 90 degree turn (round version)
+/tightarcround {
+  -1 0.5 moveto 0 0.5 lineto 0 1 0.5 270 360 arc 0.5 2 lineto
+  edgeband
+  primary_color
+  w setlinewidth
+  stroke
+} bind def
+
+% 90 degree turn (square version)
+/tightarcsquare {
+  -1 0.5 moveto 0.5 0.5 lineto 0.5 2 lineto
+  edgeband
+  primary_color
+  w setlinewidth
+  stroke
+} bind def
+  
+/f1 0.3 def
+/f2 0.3 def
+
+% edge to opposite corner (over at corner)
+/loosearc_over {
+  -1 0.5 moveto
+  0 0.5 lineto
+  f1 0.5
+  1 wp 2 div dp add sub wp 2 div dp add
+  dup 2 index exch
+  f2 add exch f2 sub exch 4 2 roll curveto
+  2 -1 lineto
+
+  edgeband
+  primary_color
+  w setlinewidth
+  stroke
+} bind def
+  
+% edge to opposite corner (under at corner)
+/loosearc_under {
+  loosearc_over
+
+  newpath 0 -1 moveto 2 1 lineto
+  separatorband
+  edgeband
+  secondary_color
+  w setlinewidth
+  stroke
+} bind def
+
+%%%
+%%% commands for derived knoxels
+%%%
+
+/clockwise {
+  gsave
+    0.5 0.5 translate
+    270 rotate
+    -0.5 -0.5 translate
+    cvx exec
+  grestore
+} bind def
+
+/anticlockwise {
+  gsave
+    0.5 0.5 translate
+    90 rotate
+    -0.5 -0.5 translate
+    cvx exec
+  grestore
+} bind def
+
+/halfturn {
+  gsave
+    0.5 0.5 translate
+    180 rotate
+    -0.5 -0.5 translate
+    cvx exec
+  grestore
+} bind def
+
+/verticalflip {
+  gsave
+    0.5 0.5 translate
+    1 -1 scale
+    -0.5 -0.5 translate
+    cvx exec
+  grestore
+} bind def
+
+%%%
+%%% the main knoxel drawing command:
+%%%
+%%%   x y knoxel# primarycolor secondarycolor drawknoxel
+%%%
+%%% colors are specified as indices to the colortable
+%%%
+
+/drawknoxel {
+  /secondary_color colortable 3 -1 roll get def
+  /primary_color colortable 3 -1 roll get def
+  knoxels exch get 3 1 roll
+  gsave
+    translate
+    newpath
+    0 0 moveto 1 0 lineto 1 1 lineto 0 1 lineto closepath
+    gsave bgcolor fill grestore
+    clip newpath
+    cvx exec
+  grestore
+} bind def
+
+%%%
+%%% two ways to initialize colortable
+%%%
+
+% color gives evenly-spaced hues, bright and saturated
+/color {
+  /c exch def
+  /colortable c array def
+  0
+  c {
+    dup dup c div [ exch 1 1 /sethsbcolor cvx ] cvx colortable 3 1 roll put
+    1 add
+  } repeat
+  pop
+} bind def
+
+% monochrome makes every entry equal to monocolor
+/monochrome {
+  dup array /colortable exch def
+  0 exch {
+    dup colortable exch /monocolor load put
+    1 add
+  } repeat
+  pop
+} bind def
+
+%%%
+%%% drawing extras
+%%%
+
+% draw a square grid
+/drawgrid {
+  /ysize exch def
+  /xsize exch def
+  gsave
+    newpath
+    0
+    ysize 1 add {
+      dup dup
+      0 exch moveto xsize exch lineto
+      1 add
+    } repeat
+    pop
+    0
+    xsize 1 add {
+      dup dup
+      0 moveto ysize lineto
+      1 add
+    } repeat
+    pop
+    0.5 setgray 0 setlinewidth stroke
+  grestore
+} bind def
+
+% draw a diamond-shaped marker
+/marker {
+  gsave
+    translate
+    0.1 0 moveto
+    3 { 90 rotate 0.1 0 lineto } repeat
+    closepath
+    gsave
+      fill
+    grestore
+    gsave
+      0 setgray
+      0.01 setlinewidth
+      stroke
+    grestore
+  grestore
+} bind def
+
+%%%
+%%% defining the full 26-element knoxel arrays
+%%%
+
+% version with round corners
+/roundknoxels
+[ /diagonal
+  { /diagonal clockwise }
+  { /diagonal halfturn } 
+  { /diagonal anticlockwise }
+  /straight 
+  { /straight clockwise } 
+  /tightarcround 
+  { /tightarcround clockwise } 
+  { /tightarcround halfturn } 
+  { /tightarcround anticlockwise } 
+  /loosearc_over 
+  { /loosearc_over clockwise } 
+  { /loosearc_over halfturn } 
+  { /loosearc_over anticlockwise } 
+  /loosearc_under 
+  { /loosearc_under clockwise } 
+  { /loosearc_under halfturn } 
+  { /loosearc_under anticlockwise } 
+  { /loosearc_over verticalflip } 
+  { { /loosearc_over verticalflip } clockwise } 
+  { { /loosearc_over verticalflip } halfturn } 
+  { { /loosearc_over verticalflip } anticlockwise } 
+  { /loosearc_under verticalflip } 
+  { { /loosearc_under verticalflip } clockwise } 
+  { { /loosearc_under verticalflip } halfturn } 
+  { { /loosearc_under verticalflip } anticlockwise } 
+] def
+
+% version with square corners
+/squareknoxels
+[ /diagonal
+  { /diagonal clockwise }
+  { /diagonal halfturn } 
+  { /diagonal anticlockwise }
+  /straight 
+  { /straight clockwise } 
+  /tightarcsquare
+  { /tightarcsquare clockwise } 
+  { /tightarcsquare halfturn } 
+  { /tightarcsquare anticlockwise } 
+  /loosearc_over 
+  { /loosearc_over clockwise } 
+  { /loosearc_over halfturn } 
+  { /loosearc_over anticlockwise } 
+  /loosearc_under 
+  { /loosearc_under clockwise } 
+  { /loosearc_under halfturn } 
+  { /loosearc_under anticlockwise } 
+  { /loosearc_over verticalflip } 
+  { { /loosearc_over verticalflip } clockwise } 
+  { { /loosearc_over verticalflip } halfturn } 
+  { { /loosearc_over verticalflip } anticlockwise } 
+  { /loosearc_under verticalflip } 
+  { { /loosearc_under verticalflip } clockwise } 
+  { { /loosearc_under verticalflip } halfturn } 
+  { { /loosearc_under verticalflip } anticlockwise } 
+] def
+
+%%STOPCOPYHERE
+
+% everything above STOPCOPYHERE gets included in output knots;
+% everything below is only for producing the test page.
+
+%%%
+%%% the temporary drawing functions
+%%%
+
+% pick which set of knoxels to use
+/knoxels roundknoxels def
+
+% invokes the knoxel procedure and draws the bounding box
+/wrapper {
+  gsave
+    newpath
+    0 0 moveto 1 0 lineto 1 1 lineto 0 1 lineto closepath
+    gsave bgcolor fill grestore
+    gsave
+      clip newpath
+      cvx exec
+    grestore
+    0 setlinewidth 0.5 setgray stroke
+  grestore
+} bind def
+
+72 72 translate
+48 48 scale
+
+/Helvetica-Bold 0.3 selectfont
+
+% colors for fundamental knoxels
+/fundamental {
+  /primary_color { 1 0 0 setrgbcolor } def
+  /secondary_color { 0.5 0.8 0.5 setrgbcolor } def
+} def
+
+% colors for derived knoxels
+/derived {
+  /primary_color { 0.7 setgray } def
+  /secondary_color { 0.5 0.5 1 setrgbcolor } def
+} def
+
+/centershow {
+  dup stringwidth pop -2 div 4 -1 roll add 3 -1 roll moveto show
+} bind def
+
+/rshow { dup stringwidth pop neg 0 rmoveto show } def
+
+gsave
+  2 13.75 translate
+  0 setgray 0 setlinewidth
+  
+  /str 20 string def
+  0 0 moveto (w:) rshow
+  .3 0 moveto w str cvs show
+  0 -.4 moveto (d:) rshow
+  .3 -.4 moveto d str cvs show
+  0 -.8 moveto (s:) rshow
+  .3 -.8 moveto s str cvs show
+  0 -1.35 moveto (monocolor:) rshow
+  newpath .3 -.9 moveto 0 -0.7 rlineto 0.7 0 rlineto 0 0.7 rlineto closepath
+  gsave monocolor fill grestore stroke
+  0 -2.15 moveto (edgecolor:) rshow
+  newpath .3 -1.7 moveto 0 -0.7 rlineto 0.7 0 rlineto 0 0.7 rlineto closepath
+  gsave edgecolor fill grestore stroke
+  0 -2.95 moveto (bgcolor:) rshow
+  newpath .3 -2.5 moveto 0 -0.7 rlineto 0.7 0 rlineto 0 0.7 rlineto closepath
+  gsave bgcolor fill grestore stroke
+
+  2 -1 translate
+  /Helvetica 0.3 selectfont
+  0 0 moveto (Celtic Knot Thingy \(start.ps\)) show
+  0 -.35 moveto (Copyright \(c\) 2000 Doug Zongker) show
+  0 -.70 moveto (dougz@cs.washington.edu) show
+  0 -1.05 moveto (http://www.cs.washington.edu/homes/dougz/) show
+  
+  
+grestore
+
+/bgcolor { 250 255 div 240 255 div 230 255 div setrgbcolor } def
+
+gsave
+  0 9 translate
+  knoxels 0 get fundamental wrapper derived
+  0.5 -0.3 (0) centershow
+  1.25 0 translate
+  knoxels 1 get wrapper
+  0.5 -0.3 (1) centershow
+  1.25 0 translate
+  knoxels 2 get wrapper
+  0.5 -0.3 (2) centershow
+  1.25 0 translate
+  knoxels 3 get wrapper
+  0.5 -0.3 (3) centershow
+grestore
+
+gsave
+  0 7.5 translate
+  knoxels 4 get fundamental wrapper derived
+  0.5 -0.3 (4) centershow
+  1.25 0 translate
+  knoxels 5 get wrapper
+  0.5 -0.3 (5) centershow
+grestore
+
+gsave
+  0 6 translate
+  knoxels 6 get fundamental wrapper derived
+  0.5 -0.3 (6) centershow
+  1.25 0 translate
+  knoxels 7 get wrapper
+  0.5 -0.3 (7) centershow
+  1.25 0 translate
+  knoxels 8 get wrapper
+  0.5 -0.3 (8) centershow
+  1.25 0 translate
+  knoxels 9 get wrapper
+  0.5 -0.3 (9) centershow
+grestore
+
+gsave
+  0 4.5 translate
+  knoxels 10 get fundamental wrapper derived
+  0.5 -0.3 (10) centershow
+  1.25 0 translate
+  knoxels 11 get wrapper
+  0.5 -0.3 (11) centershow
+  1.25 0 translate
+  knoxels 12 get wrapper
+  0.5 -0.3 (12) centershow
+  1.25 0 translate
+  knoxels 13 get wrapper
+  0.5 -0.3 (13) centershow
+grestore
+
+gsave
+  0 3 translate
+  knoxels 14 get fundamental wrapper derived
+  0.5 -0.3 (14) centershow
+  1.25 0 translate
+  knoxels 15 get wrapper
+  0.5 -0.3 (15) centershow
+  1.25 0 translate
+  knoxels 16 get wrapper
+  0.5 -0.3 (16) centershow
+  1.25 0 translate
+  knoxels 17 get wrapper
+  0.5 -0.3 (17) centershow
+grestore
+
+gsave
+  0 1.5 translate
+  knoxels 18 get wrapper
+  0.5 -0.3 (18) centershow
+  1.25 0 translate
+  knoxels 19 get wrapper
+  0.5 -0.3 (19) centershow
+  1.25 0 translate
+  knoxels 20 get wrapper
+  0.5 -0.3 (20) centershow
+  1.25 0 translate
+  knoxels 21 get wrapper
+  0.5 -0.3 (21) centershow
+grestore
+
+gsave
+  0 0 translate
+  knoxels 22 get wrapper
+  0.5 -0.3 (22) centershow
+  1.25 0 translate
+  knoxels 23 get wrapper
+  0.5 -0.3 (23) centershow
+  1.25 0 translate
+  knoxels 24 get wrapper
+  0.5 -0.3 (24) centershow
+  1.25 0 translate
+  knoxels 25 get wrapper
+  0.5 -0.3 (25) centershow
+grestore
+
+%%
+%% draw a sample knot
+%%
+
+gsave
+  6.0 1.0 translate
+  0.75 dup scale
+  2 color
+  colortable 0 { 0.5 0.8 0.5 setrgbcolor } put
+  colortable 1 { 0.5 0.5 1 setrgbcolor } put
+  0 9 8 0 0 drawknoxel
+  1 9 10 0 0 drawknoxel
+  2 9 24 0 0 drawknoxel
+  3 9 9 0 0 drawknoxel
+  0 8 23 0 0 drawknoxel
+  1 8 2 0 0 drawknoxel
+  2 8 3 0 0 drawknoxel
+  3 8 11 0 0 drawknoxel
+  0 7 13 0 0 drawknoxel
+  1 7 16 0 0 drawknoxel
+  2 7 18 0 0 drawknoxel
+  3 7 25 0 0 drawknoxel
+  0 6 23 0 1 drawknoxel
+  1 6 20 1 0 drawknoxel
+  2 6 9 1 0 drawknoxel
+  3 6 4 0 0 drawknoxel
+  0 5 13 1 0 drawknoxel
+  1 5 1 0 1 drawknoxel
+  2 5 15 1 0 drawknoxel
+  3 5 4 0 0 drawknoxel
+  0 4 23 1 1 drawknoxel
+  1 4 2 1 0 drawknoxel
+  2 4 12 0 0 drawknoxel
+  3 4 6 0 0 drawknoxel
+  0 3 13 1 0 drawknoxel
+  1 3 1 1 1 drawknoxel
+  2 3 24 1 1 drawknoxel
+  3 3 9 1 0 drawknoxel
+  0 2 7 1 0 drawknoxel
+  1 2 22 1 1 drawknoxel
+  2 2 3 1 1 drawknoxel
+  3 2 11 1 0 drawknoxel
+  0 1 8 1 0 drawknoxel
+  1 1 10 1 0 drawknoxel
+  2 1 0 1 1 drawknoxel
+  3 1 25 1 1 drawknoxel
+  0 0 7 1 0 drawknoxel
+  1 0 22 1 1 drawknoxel
+  2 0 12 1 0 drawknoxel
+  3 0 6 1 0 drawknoxel
+
+  4 5 drawgrid
+grestore
+
+showpage
+%%EOF
+
+
